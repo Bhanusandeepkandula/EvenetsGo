@@ -13,8 +13,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// -------- MODELS --------
-
 type Event struct {
 	ID           string `json:"id"`
 	EventName    string `json:"eventName"`
@@ -63,9 +61,6 @@ func generateToken(user User) (string, error) {
 	return token.SignedString(jwtSecret)
 }
 
-// -------- HANDLERS --------
-
-// POST /api/login
 func loginHandler(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -95,7 +90,6 @@ func loginHandler(c *gin.Context) {
 
 	token, _ := generateToken(user)
 
-	// 👇 match frontend: it expects access_token + user
 	c.JSON(200, gin.H{
 		"message":      "Login successful",
 		"access_token": token,
@@ -166,8 +160,6 @@ func createEventHandler(c *gin.Context) {
 	c.JSON(201, gin.H{"message": "event created", "event": input})
 }
 
-// -------- MIDDLEWARE --------
-
 func authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenString := c.GetHeader("Authorization")
@@ -208,15 +200,12 @@ func adminOnly() gin.HandlerFunc {
 	}
 }
 
-// -------- MAIN --------
-
 func main() {
 	ConnectDB()
 	defer DB.Close()
 
 	r := gin.Default()
 
-	// CORS
 	r.Use(cors.New(cors.Config{
 		AllowOrigins: []string{
 			"http://localhost:5500",
@@ -235,7 +224,6 @@ func main() {
 		api.POST("/login", loginHandler)
 		api.GET("/profile", authMiddleware(), profileHandler)
 
-		// Events
 		api.POST("/events", authMiddleware(), createEventHandler)
 		api.PUT("/events/:id", authMiddleware(), updateEventHandler)
 		api.DELETE("/events/:id", authMiddleware(), deleteEventHandler)
@@ -252,7 +240,6 @@ func main() {
 	r.Run(":8081")
 }
 
-// PUT /api/events/:id  -> update existing event
 func updateEventHandler(c *gin.Context) {
 	id := c.Param("id")
 
@@ -262,13 +249,11 @@ func updateEventHandler(c *gin.Context) {
 		return
 	}
 
-	// Make sure we have an ID and keep balance in sync
 	if input.ID == "" {
 		input.ID = id
 	}
 	input.Balance = input.TotalCost - input.Paid
 
-	// If CreatedAt is empty, keep the original value (if any)
 	if input.CreatedAt == "" {
 		var createdAt string
 		err := DB.QueryRow("SELECT created_at FROM events WHERE id = $1", id).Scan(&createdAt)
@@ -280,7 +265,7 @@ func updateEventHandler(c *gin.Context) {
 		if err == nil {
 			input.CreatedAt = createdAt
 		} else {
-			// if not found, just use now
+
 			input.CreatedAt = time.Now().Format(time.RFC3339)
 		}
 	}
@@ -332,7 +317,6 @@ func updateEventHandler(c *gin.Context) {
 	c.JSON(200, gin.H{"message": "event updated", "event": input})
 }
 
-// DELETE /api/events/:id -> delete from Postgres
 func deleteEventHandler(c *gin.Context) {
 	id := c.Param("id")
 
